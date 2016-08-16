@@ -10,6 +10,11 @@ module.exports = function(port, db, githubAuthoriser) {
     var users = db.collection("users");
     var sessions = {};
 
+    // Added variables by Justas
+    var conversations = db.collection("conversations-justas");
+    var io = require("socket.io").listen(9999);
+    var clients = [];
+
     app.get("/oauth", function(req, res) {
         githubAuthoriser.authorise(req, function(githubUser, token) {
             if (githubUser) {
@@ -83,6 +88,52 @@ module.exports = function(port, db, githubAuthoriser) {
             } else {
                 res.sendStatus(500);
             }
+        });
+    });
+    /*
+    app.get("/api/conversations", function (req, res) {
+        res.json({
+          justas: "justas is amazing!"
+        });
+
+        conversations.insertOne({
+            participants: [{id: "JMiknys"}, {id: "TestUser"}],
+            messages: [{sender: "JMiknys", time: 1049, body:"first message"}]
+        });
+    });
+
+    app.post("/api/conversations", function (req, res) {
+        var conversation = req.body;
+        console.log(conversation);
+        res.sendStatus(201);
+    });
+    */
+
+    io.on('connection', function(socket) {
+        console.log("New client connected ID: "+socket.id);
+        clients.push(socket);
+
+        socket.on('disconnect', function() {
+            var index = clients.indexOf(socket);
+            if (index != -1) {
+                clients.splice(index,1);
+                console.log('Client disconnected: '+socket.id);
+            }
+        });
+
+        // New conversation request
+        socket.on('new_conversation', function(msg) {
+            console.log('Received a new conversation request: ' + JSON.stringify(msg));
+            conversations.insertOne(msg);
+        });
+
+        // Get conversations
+        socket.on('init_conversations', function(clientId) {
+            console.log("Client asked to get conversations. Asker: "+clientId);
+            var results = conversations.find({'participants.id': 'JMiknys'}).toArray(function (err, items) {
+                console.log("Found "+items.length+" conversations. Sending back answer");
+                socket.emit("init_conversations", items);
+            });
         });
     });
 

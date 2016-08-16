@@ -5,17 +5,60 @@
         <title>Chat</title>
         <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.1/angular.min.js"></script>
         <script src="js/main.js"></script>
+        <script src="http://localhost:9999/socket.io/socket.io.js "></script>
     </head>
-    <body ng-controller="ChatController">
+    <body ng-controller="ChatController as ctrl">
         <a ng-show="!loggedIn" href="{{loginUri}}">Log in</a>
         <section ng-show="loggedIn">
             <p>Logged in as {{user.name}}.</p>
-            <h2>List of registered users</h2>
-            <ul>
+            <h2 ng-show="false">List of registered users</h2>
+            <ul ng-show="false">
                 <li ng-repeat="user in users">
-                    {{user.name}}
+                    Name: {{user.name}}
+                    <br/>
+                    Image: <img height="42" width="42" ng-src="{{user.avatarUrl}}">
+                    <br/>
+                    ID: {{user.id}}
                 </li>
             </ul>
+            <h2>Start a new conversation</h2>
+            <input type="text" name="input" ng-model="title" required> <br/>
+            <select ng-model="selectedUser" ng-options="user.id as user.name for user in users">
+                <option value="">Select User</option>
+            </select>
+            <button ng-click="ctrl.addToChat()">Add to conversation</button>
+            <ul>
+                <li ng-repeat="user in chat">
+                    Name: {{user.name}}
+                    <button>Remove</button>
+                </li>
+            </ul>
+            <button ng-show="chat.length > 0" ng-click="ctrl.startChat()">Start a conversation</button>
+            <div>
+              <h3>Conversations</h3>
+              <button ng-click="ctrl.getConversations()">Check for my conversations</button>
+              <div ng-repeat="conversation in conversations">
+                <h4>Conversation Topic: {{conversation.title}}</h4>
+                <h5>Participants:</h5>
+                  <span ng-repeat="participant in conversation.participants">{{participant}}</span>
+                <h5>Messages:</h5>
+                  <ul>
+                      <li ng-repeat="message in conversation.messages">
+                          From: {{message.sender}} <br/>
+                          Body: {{message.body}}  <br/>
+                          Time: {{message.time | date:"MM/dd/yyyy 'at' h:mma"}}
+                      </li>
+                  </ul>
+                  <input ng-model="newMessage" placeholder="Enter your message" type="text" name="input"> <br/>
+                  <button ng-click="ctrl.sendMessage(conversation._id, newMessage)">Send message</button>
+              </div>
+            </div>
+
         </section>
+
+
+        <script>
+            var socket = io("http://localhost:9999/");
+        </script>
     </body>
 </html>

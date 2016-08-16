@@ -3,3 +3,6 @@ deployment:
     branch: master
     heroku:
       appname: chat-grad-project-justas
+machine:
+  node:
+    version: 6.3.1

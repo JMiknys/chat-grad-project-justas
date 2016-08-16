@@ -12,7 +12,10 @@ MongoClient.connect(dbUri, function(err, db) {
         console.log("Failed to connect to db", err);
         return;
     }
+
     var githubAuthoriser = oAuthGithub(oauthClientId, oauthSecret);
+
     server(port, db, githubAuthoriser);
+
     console.log("Server running on port " + port);
 });
