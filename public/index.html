@@ -3,8 +3,8 @@
     <head>
         <meta charset="utf-8">
         <title>Chat</title>
+        <link href="main.css" rel="stylesheet" type="text/css">
         <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.1/angular.min.js"></script>
-        <script src="js/main.js"></script>
         <script src="http://localhost:9999/socket.io/socket.io.js "></script>
     </head>
     <body ng-controller="ChatController as ctrl">
@@ -22,6 +22,7 @@
                 </li>
             </ul>
             <h2>Start a new conversation</h2>
+            <span>Topic</span><br/>
             <input type="text" name="input" ng-model="title" required> <br/>
             <select ng-model="selectedUser" ng-options="user.id as user.name for user in users">
                 <option value="">Select User</option>
@@ -36,7 +37,8 @@
             <button ng-show="chat.length > 0" ng-click="ctrl.startChat()">Start a conversation</button>
             <div>
               <h3>Conversations</h3>
-              <button ng-click="ctrl.getConversations()">Check for my conversations</button>
+              <button ng-click="ctrl.getConversations()">Show my conversations</button>
+              <!--
               <div ng-repeat="conversation in conversations">
                 <h4>Conversation Topic: {{conversation.title}}</h4>
                 <h5>Participants:</h5>
@@ -52,13 +54,50 @@
                   <input ng-model="newMessage" placeholder="Enter your message" type="text" name="input"> <br/>
                   <button ng-click="ctrl.sendMessage(conversation._id, newMessage)">Send message</button>
               </div>
+            -->
+            <div class="wrapper" ng-repeat="conversation in conversations">
+              <div class="chat-metadata">
+                <span>Topic: {{conversation.title}}</span>
+                <span>Participants: {{conversation.participants.length}}</span>
+                <button ng-click="ctrl.leaveConversation(conversation._id)">Leave conversation</button>
+              </div>
+              <div class="chat-container">
+                  <div class="left-container">
+                      <div class="messages-container" id="{{conversation._id}}-messages">
+                        <ul class="no-style-ul messages-list">
+                          <li ng-repeat="message in conversation.messages">
+                            <span style="font-style:italic;">{{message.time | date:"dd/MM h:mma"}}</span>
+                            <span style="font-weight:bold;">{{message.sender}}: </span>
+                            <p>{{message.body}}</p>
+                          </li>
+                        </ul>
+                      </div>
+                      <div class="inputbox-container">
+                          <input id="{{conversation._id}}-input" ng-model="newMessage" placeholder="Enter your message" type="text" name="input">
+                      </div>
+                  </div>
+                  <div class="right-container">
+                    <div class="participants-container">
+                      <ul class="no-style-ul participants-list">
+                        <li ng-repeat="user in conversation.participants">
+                        <img ng-show="!ctrl.isOnline(user.id)" src="images/red_circle.jpg"></img>
+                        <img ng-show="ctrl.isOnline(user.id)" src="images/circle_green.png"></img>
+                        {{user.id}}</li>
+                      </ul>
+                    </div>
+                    <div class="send-container">
+                      <button ng-click="ctrl.sendMessage(conversation._id, newMessage)">Send</button>
+                    </div>
+                  </div>
+              </div>
             </div>
+            <button ng-click="ctrl.showOnline()">Check online users</button>
 
         </section>
-
-
+        <script src="js/main.js"></script>
         <script>
             var socket = io("http://localhost:9999/");
         </script>
+
     </body>
 </html>
