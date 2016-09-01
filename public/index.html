@@ -3,14 +3,52 @@
     <head>
         <meta charset="utf-8">
         <title>Chat</title>
-        <link href="main.css" rel="stylesheet" type="text/css">
+        <script src="https://code.jquery.com/jquery-3.1.0.min.js" integrity="sha256-cCueBR6CsyA4/9szpPfrX3s49M9vUU5BgtiJj06wt/s=" crossorigin="anonymous"></script>
+        <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
         <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.1/angular.min.js"></script>
-        <script src="http://localhost:9999/socket.io/socket.io.js "></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+        <link href="main.css" rel="stylesheet" type="text/css">
+        <script type="text/javascript" src="/socket.io/socket.io.js"></script>
     </head>
     <body ng-controller="ChatController as ctrl">
+      <!--
         <a ng-show="!loggedIn" href="{{loginUri}}">Log in</a>
         <section ng-show="loggedIn">
             <p>Logged in as {{user.name}}.</p>
+            <button class="btn btn-info" data-toggle="collapse" data-target="#profile">User Profile</button>
+            <div id="profile" class="collapse">
+              <form class="form-horizontal">
+                <div class="form-group">
+                  <label class="control-label col-sm-2" for="name">Name:</label>
+                  <div class="col-sm-4">
+                    <input type="name" class="form-control" id="name" value="{{user.name}}">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="control-label col-sm-2" for="avatar">Avatar URL:</label>
+                  <div class="col-sm-4">
+                    <input type="avatar" class="form-control" id="avatar" value="{{user.avatarUrl}}">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <div class="col-sm-2"></div>
+                  <div class="col-sm-3">
+                    <img src="{{user.avatarUrl}}" class="img-thumbnail" width="100" height="100">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="control-label col-sm-2" for="color">Chat bubble color:</label>
+                  <div class="col-sm-4">
+                    <input type="color" class="form-control" id="color" value="{{user.color}}">
+                  </div>
+                </div>
+                <div class="form-group">
+                  <div class="col-sm-offset-2 col-sm-10">
+                    <button type="submit" class="btn btn-default" ng-click="ctrl.saveUserProfile()">Save</button>
+                  </div>
+                </div>
+              </form>
+            </div>
             <h2 ng-show="false">List of registered users</h2>
             <ul ng-show="false">
                 <li ng-repeat="user in users">
@@ -37,67 +75,309 @@
             <button ng-show="chat.length > 0" ng-click="ctrl.startChat()">Start a conversation</button>
             <div>
               <h3>Conversations</h3>
-              <button ng-click="ctrl.getConversations()">Show my conversations</button>
-              <!--
-              <div ng-repeat="conversation in conversations">
-                <h4>Conversation Topic: {{conversation.title}}</h4>
-                <h5>Participants:</h5>
-                  <span ng-repeat="participant in conversation.participants">{{participant}}</span>
-                <h5>Messages:</h5>
-                  <ul>
-                      <li ng-repeat="message in conversation.messages">
-                          From: {{message.sender}} <br/>
-                          Body: {{message.body}}  <br/>
-                          Time: {{message.time | date:"MM/dd/yyyy 'at' h:mma"}}
-                      </li>
-                  </ul>
-                  <input ng-model="newMessage" placeholder="Enter your message" type="text" name="input"> <br/>
-                  <button ng-click="ctrl.sendMessage(conversation._id, newMessage)">Send message</button>
-              </div>
-            -->
-            <div class="wrapper" ng-repeat="conversation in conversations">
-              <div class="chat-metadata">
-                <span>Topic: {{conversation.title}}</span>
-                <span>Participants: {{conversation.participants.length}}</span>
-                <button ng-click="ctrl.leaveConversation(conversation._id)">Leave conversation</button>
-              </div>
-              <div class="chat-container">
-                  <div class="left-container">
-                      <div class="messages-container" id="{{conversation._id}}-messages">
-                        <ul class="no-style-ul messages-list">
-                          <li ng-repeat="message in conversation.messages">
-                            <span style="font-style:italic;">{{message.time | date:"dd/MM h:mma"}}</span>
-                            <span style="font-weight:bold;">{{message.sender}}: </span>
-                            <p>{{message.body}}</p>
+            <details ng-repeat="conversation in conversations" id="{{conversation._id}}-details">
+              <summary ng-click="ctrl.openConversation(conversation._id+'-messages', conversation)">
+                {{conversation.title}} | {{conversation.participants}} <span class="blink"><b>{{conversation.unread > 0? "| NEW MESSAGES: "+conversation.unread: ""}}</b><span>
+              </summary>
+              <div class="wrapper">
+                <div class="chat-metadata">
+                  <span>Topic: {{conversation.title}}</span>
+                  <span>Participants: {{conversation.participants.length}}</span>
+                  <button ng-click="ctrl.leaveConversation(conversation)">Leave conversation</button>
+                </div>
+                <div class="chat-container">
+                    <div class="left-container">
+                        <div class="messages-container" id="{{conversation._id}}-messages">
+                          <ul class="no-style-ul messages-list">
+                            <div ng-repeat="message in conversation.messages">
+                              <div style="display: flex;">
+                              <div ng-show="{{message.sender === user._id}}"style="padding-top:20px;">
+                                  <img src="{{ctrl.getUserImage(message.sender)}}" class="img-thumbnail" width="40" height="40">
+                              </div>
+                              <div style="flex: 1;">
+                                <li style="background-color: {{ctrl.getUserColor(message.sender)}};">
+                                  <span style="font-weight:bold;">{{message.sender}} </span>
+                                  <p>{{message.body}}</p>
+                                  <div style="font-style:italic; font-size:11px; color:grey; text-align:right;">{{message.time | date:"h:mma dd/MM "}}</div>
+                                </li>
+                              </div>
+                              <div ng-show="{{message.sender !== user._id}}" style="padding-top:20px;">
+                                  <img src="{{ctrl.getUserImage(message.sender)}}" class="img-thumbnail" width="40" height="40">
+                              </div>
+                            </div>
+                          </div>
+                          </ul>
+                        </div>
+                        <div class="inputbox-container">
+                            <input id="{{conversation._id}}-input" ng-model="newMessage" placeholder="Enter your message" type="text" name="input">
+                        </div>
+                    </div>
+                    <div class="right-container">
+                      <div class="participants-container">
+                        <ul class="no-style-ul participants-list">
+                          <li ng-repeat="user in conversation.participants">
+                          <img ng-show="!ctrl.isOnline(user.id)" src="images/red_circle.jpg"></img>
+                          <img ng-show="ctrl.isOnline(user.id)" src="images/circle_green.png"></img>
+                          {{user.id}}
                           </li>
+                          <button type="button" class="btn btn-info" aria-label="Left Align" data-toggle="modal" data-target="#addUser-{{conversation._id}}">
+                            <span class="glyphicon glyphicon-plus"></span>
+                            Add people
+                          </button>
+                        -->
+                          <!-- Modal
+                          <div id="addUser-{{conversation._id}}" class="modal fade" role="dialog">
+                              <div class="modal-dialog">
+                                <div class="modal-content">
+                                  <div class="modal-header">
+                                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                                    <h4 class="modal-title">Add user to the conversation</h4>
+                                  </div>
+                                  <div class="modal-body">
+                                    <div>Search: <input ng-model="$ctrl.query" placeholder="Search for user" /></div>
+                                    <h2>List of registered users</h2>
+                                    <form id="add-more-users-{{conversation._id}}">
+                                        <ul class="no-style-ul">
+                                            <li ng-repeat="user in users | filter:$ctrl.query">
+                                              <div class="checkbox">
+                                                  <label><input type="checkbox" value="{{user.id}}">{{user.name}} (id: {{user.id}})</label>
+                                              </div>
+                                            </li>
+                                        </ul>
+                                      </div>
+                                      <div class="modal-footer">
+                                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                                        <button type="submit" class="btn btn-submit" data-dismiss="modal" ng-click="ctrl.addUsersToConversation(conversation._id)">Add</button>
+                                      </div>
+                                    </form>
+                                </div>
+                              </div>
+                          </div>
+                           Modal ends
                         </ul>
                       </div>
-                      <div class="inputbox-container">
-                          <input id="{{conversation._id}}-input" ng-model="newMessage" placeholder="Enter your message" type="text" name="input">
+                      <div class="send-container">
+                        <button ng-click="ctrl.sendMessage(conversation._id, newMessage)">Send</button>
                       </div>
-                  </div>
-                  <div class="right-container">
-                    <div class="participants-container">
-                      <ul class="no-style-ul participants-list">
-                        <li ng-repeat="user in conversation.participants">
-                        <img ng-show="!ctrl.isOnline(user.id)" src="images/red_circle.jpg"></img>
-                        <img ng-show="ctrl.isOnline(user.id)" src="images/circle_green.png"></img>
-                        {{user.id}}</li>
-                      </ul>
                     </div>
-                    <div class="send-container">
-                      <button ng-click="ctrl.sendMessage(conversation._id, newMessage)">Send</button>
-                    </div>
-                  </div>
+                </div>
               </div>
-            </div>
-            <button ng-click="ctrl.showOnline()">Check online users</button>
+            </details>
 
+            <button ng-click="ctrl.showOnline()">Check online users</button>
+          -->
         </section>
         <script src="js/main.js"></script>
-        <script>
-            var socket = io("http://localhost:9999/");
-        </script>
+        <a ng-show="!loggedIn" href="{{loginUri}}">Log in</a>
+        <div ng-show="loggedIn" class="container-fluid">
+          <div class="row chat-meta">
+            <div class="col-md-3">
+              <h3 class="dropdown-toggle" data-toggle="dropdown">{{user.name}}<span class="caret"></span></button></h3>
+              <ul class="dropdown-menu">
+                <li><a data-toggle="modal" data-target="#profile">User Profile</a></li>
+              </ul>
+              <div id="profile" class="modal fade" role="dialog">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <button type="button" class="close" data-dismiss="modal">&times;</button>
+                      <h4 class="modal-title">User Profile</h4>
+                    </div>
+                    <div class="modal-body">
+                      <form class="form-horizontal">
+                        <div class="form-group">
+                          <label class="control-label col-sm-2" for="name">Name:</label>
+                          <div class="col-sm-10">
+                            <input type="name" class="form-control" id="name" value="{{user.name}}">
+                          </div>
+                        </div>
+                        <div class="form-group">
+                          <label class="control-label col-sm-2" for="avatar">Avatar URL:</label>
+                          <div class="col-sm-10">
+                            <input type="avatar" class="form-control" id="avatar" value="{{user.avatarUrl}}">
+                          </div>
+                        </div>
+                        <div class="form-group">
+                          <div class="col-sm-2"></div>
+                          <div class="col-sm-3">
+                            <img src="{{user.avatarUrl}}" class="img-thumbnail" width="100" height="100">
+                          </div>
+                        </div>
+                        <div class="form-group">
+                          <label class="control-label col-sm-2" for="color">Chat bubble color:</label>
+                          <div class="col-sm-10">
+                            <input type="color" class="form-control" id="color" value="{{user.color}}">
+                          </div>
+                        </div>
+                      </form>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                      <button type="submit" class="btn btn-primary" data-dismiss="modal" ng-click="ctrl.saveUserProfile()">Save</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-6">
+            </div>
+          </div>
+          <div class="row chat-window">
+            <div class="col-md-3">
+            </div>
+            <div class="col-md-6">
+              <h4>{{conversations[selectedConversation].title}}</h4>
+            </div>
+          </div>
+          <div class="row chat-window">
+            <div class="col-md-3">
+              <details>
+                <summary>Users</summary>
+                <input class="form-control" ng-model="$ctrl.query" placeholder="Find someone" />
+                <ul class="no-style-ul">
+                    <li ng-repeat="user in users | filter:$ctrl.query">
+                        <img height="42" width="42" ng-src="{{user.avatarUrl}}">
+                        <span>{{user.name}}</span>
+                        <img ng-show="!ctrl.isOnline(user.id)" src="images/red_circle.jpg"></img>
+                        <img ng-show="ctrl.isOnline(user.id)" src="images/circle_green.png"></img>
+                    </li>
+                </ul>
+              </details>
+                <h4>Conversations</h4>
+                <ul class="no-style-ul">
+                  <li ng-repeat="conversation in conversations" ng-click="ctrl.setConversation($index)" ng-class="{selected: conversation._id === conversations[selectedConversation]._id}">
+                      <span>{{conversation.title}}</span>
+                      <span class="badge" ng-class="{blink: conversation.unread > 0}">{{conversation.unread || 0}}</span>
+                      <button ng-click="ctrl.leaveConversation(conversation)" style="font-size:20px;" type="button" class="close" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                  </li>
+                </ul>
+                <a data-toggle="modal" data-target="#startConversation">
+                    <span class="glyphicon glyphicon-plus" aria-hidden="true"></span>
+                </a>
 
+                <div id="startConversation" class="modal fade" role="dialog">
+                  <div class="modal-dialog">
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                        <h4 class="modal-title">Start a conversation</h4>
+                      </div>
+                      <div class="modal-body">
+                        <form class="form-horizontal">
+                          <div class="form-group">
+                            <label class="control-label col-sm-2" for="name">Topic</label>
+                            <div class="col-sm-10">
+                              <input type="topic" ng-model="title" class="form-control" placeholder="Enter conversation topic" required>
+                            </div>
+                          </div>
+                          <div class="form-group">
+                            <label class="control-label col-sm-2">Add participant</label>
+                            <div class="col-sm-8">
+                              <select class="form-control" ng-model="selectedUser" ng-options="user.id as user.name for user in users">
+                                  <option value="">Select User</option>
+                              </select>
+                            </div>
+                            <div class="col-sm-2">
+                              <button type="button" class="btn btn-default" ng-click="ctrl.addToChat()">Add</button>
+                            </div>
+                          </div>
+                          <div class="form-group">
+                            <label class="control-label col-sm-2" for="name">Participants</label>
+                            <div class="col-sm-10">
+                              <ul>
+                                <li ng-repeat="user in chat">
+                                    Name: {{user.name}}
+                                    <button class="btn btn-default">Remove</button>
+                                </li>
+                              </ul>
+                            </div>
+                          </div>
+                          <button type="submit" class="btn btn-primary" ng-show="chat.length > 0" ng-click="ctrl.startChat()">Start a conversation</button>
+                        </form>
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+            </div>
+            <div class="col-md-6">
+              <div id="conversation-container">
+                <ul class="no-style-ul messages-list">
+                  <div ng-repeat="message in conversations[selectedConversation].messages" class="message-container">
+                    <div ng-show="{{message.sender === user._id}}" style="padding-top:10px; margin-right:10px;">
+                        <img src="{{ctrl.getUserImage(message.sender)}}" class="img-thumbnail" width="40" height="40">
+                    </div>
+                    <div class="message-body">
+                      <li style="background-color: {{ctrl.getUserColor(message.sender)}};">
+                        <span style="font-weight:bold;">{{message.sender}} </span>
+                        <p>{{message.body}}</p>
+                        <div style="font-style:italic; font-size:11px; color:grey; text-align:right;">{{message.time | date:"h:mma dd/MM "}}</div>
+                      </li>
+                    </div>
+                    <div ng-show="{{message.sender !== user._id}}" style="padding-top:10px; margin-left: 10px;">
+                      <img src="{{ctrl.getUserImage(message.sender)}}" class="img-thumbnail" width="40" height="40">
+                    </div>
+                  </div>
+                </ul>
+              </div>
+              <form ng-submit="ctrl.sendMessage()">
+                <input class="form-control" ng-model="newMessage" placeholder="Type your message" type="text">
+              </form>
+            </div>
+            <div ng-show="selectedConversation>=0" class="col-md-3">
+              <h4>Participants</h3>
+              <ul class="no-style-ul participants-list">
+                <li ng-repeat="user in conversations[selectedConversation].participants">
+                <img ng-show="!ctrl.isOnline(user.id)" src="images/red_circle.jpg"></img>
+                <img ng-show="ctrl.isOnline(user.id)" src="images/circle_green.png"></img>
+                {{user.id}}
+                </li>
+                <button type="button" class="btn btn-info" aria-label="Left Align" data-toggle="modal" data-target="#addUsers-modal">
+                  <span class="glyphicon glyphicon-plus"></span>
+                  Add people
+                </button>
+
+                <div id="addUsers-modal" class="modal fade" role="dialog">
+                  <div class="modal-dialog">
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                        <h4 class="modal-title">Add user to the conversation</h4>
+                      </div>
+                      <div class="modal-body">
+                        <div>Search: <input ng-model="$ctrl.query" placeholder="Search for user" /></div>
+                        <h2>List of registered users</h2>
+                        <form id="addUsers-form">
+                        <ul class="no-style-ul">
+                            <li ng-repeat="user in users | filter:$ctrl.query">
+                              <div class="checkbox">
+                                  <label><input type="checkbox" value="{{user.id}}">{{user.name}} (id: {{user.id}})</label>
+                              </div>
+                            </li>
+                        </ul>
+                        </div>
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                          <button type="submit" class="btn btn-submit" data-dismiss="modal" ng-click="ctrl.addUsersToConversation()">Add</button>
+                        </div>
+                        </form>
+                    </div>
+                  </div>
+                </div>
+              </ul>
+            </div>
+          </div>
+          <div ng-show="selectedConversation>=0" class="row">
+              <div class="col-md-3">
+              </div>
+              <div style="padding-top:20px" class="col-md-6">
+                  <button ng-click="ctrl.clearConversation()" class="btn btn-default">Clear messages</button>
+                  <button ng-click="ctrl.changeTopic()" class="btn btn-default">Change topic</button>
+              </div>
+          </div>
     </body>
 </html>

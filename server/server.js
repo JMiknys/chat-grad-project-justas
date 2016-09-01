@@ -1,9 +1,15 @@
 /*globals Map, socket */
 var express = require("express");
 var cookieParser = require("cookie-parser");
+var socketIo = require("socket.io");
 
 module.exports = function(port, db, githubAuthoriser) {
     var app = express();
+    //var server = http.Server(app);
+    var server = app.listen(port);
+    var io = socketIo.listen(server);
+
+    //server.listen(8080);
 
     app.use(express.static("public"));
     app.use(cookieParser());
@@ -13,9 +19,16 @@ module.exports = function(port, db, githubAuthoriser) {
 
     // Added variables by Justas
     var conversations = db.collection("conversations-justas");
-    var io = require("socket.io").listen(9999);
+    // var io = require("socket.io").listen(9000);
     var clients = new Map();
-    var onlineUsers = {};
+    //var onlineUsers = {};
+    var onlineUsers = [];
+    // load users
+
+    users.find().toArray(function (err, userArray) {
+        onlineUsers = userArray;
+    });
+
     var ObjectID = require("mongodb").ObjectID;
 
     app.get("/oauth", function(req, res) {
@@ -29,7 +42,8 @@ module.exports = function(port, db, githubAuthoriser) {
                         users.insertOne({
                             _id: githubUser.login,
                             name: githubUser.name,
-                            avatarUrl: githubUser.avatar_url
+                            avatarUrl: githubUser.avatar_url,
+                            color: "#D3D3D3"
                         });
                     }
                     sessions[token] = {
@@ -43,7 +57,6 @@ module.exports = function(port, db, githubAuthoriser) {
             else {
                 res.sendStatus(400);
             }
-
         });
     });
 
@@ -85,7 +98,8 @@ module.exports = function(port, db, githubAuthoriser) {
                     return {
                         id: user._id,
                         name: user.name,
-                        avatarUrl: user.avatarUrl
+                        avatarUrl: user.avatarUrl,
+                        color: user.color
                     };
                 }));
             } else {
@@ -94,32 +108,113 @@ module.exports = function(port, db, githubAuthoriser) {
         });
     });
 
+    function removeClient(socket) {
+        var disconnectedUser = clients.get(socket);
+        console.log("Client disconnected: " + disconnectedUser);
+        if (disconnectedUser !== null) {
+            setUserOnlineStatus(disconnectedUser, false);
+            //delete onlineUsers[disconnectedUser];
+            clients.delete(socket);
+            // Let everyone else know that user went offline
+            io.sockets.emit("user-update", getUserProfile(disconnectedUser));
+        }
+    }
+
+    function addClient(socket) {
+        clients.set(socket, null);
+    }
+
+    function setUserOnlineStatus(userId, status) {
+        var index;
+        if (userId !== null) {
+            onlineUsers.forEach(function (el, i) {
+                if (el._id === userId) {
+                    index = i;
+                }
+            });
+            onlineUsers[index].online = status;
+        }
+    }
+
+    function getUserProfile (userId) {
+        var index;
+        onlineUsers.forEach(function (el, i) {
+            if (el._id === userId) {
+                index = i;
+            }
+        });
+        return onlineUsers[index];
+    }
+
     io.on("connection", function(socket) {
         console.log("New client connected ID: " + socket.id);
-        clients.set(socket, null);
+        addClient(socket);
 
         socket.on("disconnect", function() {
-            var disconnectedUser = clients.get(socket);
-            console.log("Client disconnected: " + disconnectedUser);
-            delete onlineUsers[disconnectedUser];
-            clients.delete(socket);
-
-            // TODO SEND EVERYONE USER DISCONNECTED MESSAGE!
-            io.sockets.emit("user-disconnect", disconnectedUser);
-
+            removeClient(socket);
         });
 
+        // Register User
+        socket.on("register_user", function(userId) {
+            clients.set(socket, userId);
+            //onlineUsers[userId] = "online";
+            setUserOnlineStatus(userId, true);
+
+            console.log("user registered: " + clients.get(socket));
+
+            // send the client a list of other registered users
+            socket.emit("users", onlineUsers);
+
+            // Tell other clients that user connected
+            socket.broadcast.emit("user-update", getUserProfile(userId));
+        });
+
+        // Update user profile
+        socket.on("update-profile", function(profile) {
+            console.log("user profile update received");
+            users.updateOne(
+              {_id: profile.id},
+              {$set: {"name": profile.name, "avatarUrl": profile.avatarUrl, "color": profile.color
+                      }
+              }, function(err, d) {
+                  // Success handler when user added to the conversation
+                  onlineUsers.forEach(function(el, i) {
+                      console.log(el._id + "===" + profile.id);
+                      if (el._id === profile.id) {
+                          onlineUsers[i].name = profile.name;
+                          onlineUsers[i].avatarUrl = profile.avatarUrl;
+                          onlineUsers[i].color = profile.color;
+
+                          // Tell other clients about profile update
+                          socket.broadcast.emit("user-update", getUserProfile(profile.id));
+                      }
+                  });
+              });
+        });
         // New conversation request
         socket.on("new_conversation", function(msg) {
             console.log("Received a new conversation request: " + JSON.stringify(msg));
-            conversations.insertOne(msg);
+            conversations.insertOne(msg, function(err, conversation) {
+                // Add all participants to the room
+                msg.participants.forEach(function(el) {
+                    clients.forEach(function (val, key, map) {
+                        //console.log(val+"==="+el.id);
+                        // If person currently is online, add him to the chat channel
+                        if (val === el.id) {
+                            key.join(msg._id);
+                        }
+                    });
+                });
+                io.to(msg._id).emit("new_conversation", msg);
+                // Once item has been inserted return msg - which will have ID as well
+            });
         });
 
         // Get conversations
         socket.on("init_conversations", function(clientId) {
             console.log("Client asked to get conversations. Asker: " + clientId);
             var results = conversations.find({"participants.id": clientId}).toArray(function (err, items) {
-                console.log(JSON.stringify(items));
+                //console.log(JSON.stringify(items));
                 socket.emit("init_conversations", items);
                 // Subscribe to all rooms
                 items.forEach(function (el) {
@@ -148,28 +243,55 @@ module.exports = function(port, db, githubAuthoriser) {
 
         socket.on("leaveConversation", function(data) {
             console.log("Leave request received: " + JSON.stringify(data));
+
             conversations.updateOne(
             {_id: new ObjectID(data.conversation)},
             {$pull : {"participants": {id: data.userId}}
-          }, function(err, data) {
-              // callback after user is deleted from conversation
-          });
+            }, function(err, data) {
+                // callback after user is deleted from conversation
+            });
 
+            //var msg = {id: data.conversation, sender: "Server", time: Date.now(), body: "Stuff"};
+            io.to(data.conversation).emit("leave-conversation", data);
+            //TODO: UNSUBSCRIBE FROM CONVERSATION!
+            //io.to(data.conversation).emit("message", "User: " + data.userId + " has lef the conversation.");
         });
 
-        socket.on("register_user", function(userId) {
-            clients.set(socket, userId);
-            onlineUsers[userId] = "online";
-            console.log("user registered: " + clients.get(socket));
+        // Add more users to conversation
+        socket.on("add-more-users", function(data) {
+            data.participants.forEach(function(el) {
+                conversations.updateOne(
+                  {_id: new ObjectID(data.id)},
+                  {$push: {"participants": {id: el.id}
+                          }
+                  }, function(err, d) {
+                        // Success handler when user added to the conversation
 
-            // send the client a list of other registered users
-            socket.emit("users", onlineUsers);
+                        // Check if user is online, if so subscribe him to the channel
+                        clients.forEach(function (val, key, map) {
+                            // If person currently is online, add him to the chat channel
+                            if (val === el.id) {
+                                key.join(data.id);
+                            }
+                        });
+                    });
+            });
 
-            // TODO SEND OTHER CLIENTS USER CONNECTED MESSAGE!
-            socket.broadcast.emit("user-connect", userId);
+            // Tell everyone in the channel about new user
+            var results = conversations.find({"_id": new ObjectID(data.id)}).toArray(function (err, items) {
+                // Send conversation to everyone in the chat
+                io.to(data.id).emit("user-joined", items[0]);
+            });
         });
-
+        socket.on("change-topic", function (data) {
+            console.log("got change request");
+            conversations.updateOne(
+              {_id: new ObjectID(data.id)},
+              {$set: {"title": data.topic}
+              }, function(err, d) {
+                  io.to(data.id).emit("change-topic", data);
+              });
+        });
     });
-
-    return app.listen(port);
+    return server;
 };

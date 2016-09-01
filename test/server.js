@@ -2,6 +2,8 @@ var server = require("../server/server");
 var request = require("request");
 var assert = require("chai").assert;
 var sinon = require("sinon");
+var io = require("socket.io-client");
+var MongoClient = require("mongodb").MongoClient;
 
 var testPort = 52684;
 var baseUrl = "http://localhost:" + testPort;
@@ -31,13 +33,19 @@ describe("server", function() {
     var githubAuthoriser;
     var serverInstance;
     var dbCollections;
+    // var callback = sinon.spy();
     beforeEach(function() {
         cookieJar = request.jar();
         dbCollections = {
             users: {
-                find: sinon.stub(),
+                find: sinon.stub().returns({
+                    toArray: sinon.spy(function(callback) {
+                        return callback(null, [testUser, testUser2]);
+                    })
+                }),
                 findOne: sinon.stub(),
-                insertOne: sinon.spy()
+                insertOne: sinon.spy(),
+                updateOne: sinon.stub()
             }
         };
         db = {
@@ -119,7 +127,8 @@ describe("server", function() {
                 assert.deepEqual(dbCollections.users.insertOne.firstCall.args[0], {
                     _id: "bob",
                     name: "Bob Bilson",
-                    avatarUrl: "http://avatar.url.com/u=test"
+                    avatarUrl: "http://avatar.url.com/u=test",
+                    color: "#D3D3D3"
                 });
                 done();
             });
@@ -262,4 +271,204 @@ describe("server", function() {
             });
         });
     });
+
+    describe("Socket test", function () {
+        var mongoDb;
+        var mongoServer;
+        var client1;
+        var client2;
+        var conversations;
+        before(function (done) {
+            MongoClient.connect("mongodb://justas:justas@ds021326.mlab.com:21326/chat", function(err, mongo) {
+                if (err) {
+                    console.log("Failed to connect to db", err);
+                    return;
+                }
+                mongoDb = mongo;
+                mongoDb.collection("users").insertOne(testUser);
+                mongoDb.collection("users").insertOne(testUser2);
+
+                mongoServer = server(52685, mongoDb, githubAuthoriser);
+                setTimeout(function() {
+                    done();
+                }, 1000);
+                //done();
+            });
+        });
+        beforeEach(function(done) {
+            done();
+        });
+        afterEach(function() {
+
+        });
+        after(function() {
+            mongoDb.dropDatabase();
+            mongoServer.close();
+        });
+
+        it("Connecting and register user", function(done) {
+            //var spy = sinon.spy(serverInstance, "addClient");
+            client1 = io.connect("http://localhost:52685");
+            client2 = io.connect("http://localhost:52685");
+            //assert(spy.calledOnce);
+
+            /*
+            client.on("users", function (data) {
+                console.log("Success?");
+            });
+            var serverMessage;
+            client.on("new_conversation", function (smsg) {
+                serverMessage = smsg;
+            });
+
+            var profile = {};
+            profile.id = "bob";
+            profile.avatarUrl = testGithubUser.avatar_url;
+            profile.color = "#D3D3D3";
+            client.emit("update-profile", profile);
+
+            var data = {};
+            data.participants = [{id: testUser._id}, {id: testUser2._id}];
+            data.title = "Test";
+            data.messages = [{sender: testUser._id, time: Date.now(), body: "Hello"}];
+
+            client.emit("new_conversation", data);
+
+            client2.emit("init_conversations", testUser2._id);
+
+            /*
+            var message = {};
+            message.id = serverMessage._id;
+            message.sender = testUser._id;
+            message.time = Date.now();
+            message.body = "Hi";
+            client.emit("message", message);
+            */
+            /*
+            setTimeout(function() {
+                client1.disconnect();
+                client2.disconnect();
+            }, 1000);
+            */
+
+            setTimeout(function() {
+                assert(true);
+                done();
+            }, 500);
+
+        });
+        it("Server sends back list of users after registering", function(done) {
+            client1.emit("register_user", testUser._id);
+            client2.emit("register_user", testUser2._id);
+
+            client1.on("users", function(users) {
+                assert.equal(users.length, 2);
+                done();
+            });
+        });
+        it("Client able to update profile", function(done) {
+            var profile = {};
+            profile.id = testUser._id;
+            profile.avatarUrl = testGithubUser.avatar_url;
+            profile.color = "#D3D3D3";
+
+            client1.emit("update-profile", profile);
+
+            client2.on("user-update", function(data) {
+                assert(data._id, testUser._id);
+                done();
+            });
+            /*
+            setTimeout(function() {
+                done();
+            }, 1000);
+            */
+        });
+        it("Create a new conversation", function(done) {
+            var data = {};
+            data.participants = [{id: testUser._id}, {id: testUser2._id}];
+            data.title = "Test";
+            data.messages = [{sender: testUser._id, time: Date.now(), body: "Hello"}];
+
+            client1.emit("new_conversation", data);
+
+            client1.on("new_conversation", function (smsg) {
+                assert(smsg._id !== "undefined");
+                done();
+            });
+        });
+        it("get a list of conversations", function(done) {
+            client2.emit("init_conversations", testUser2._id);
+
+            client2.on("init_conversations", function(data) {
+                conversations = data;
+                assert.equal(data.length, 1);
+                done();
+            });
+        });
+        it("send a message", function(done) {
+            var message = {};
+            message.id = conversations[0]._id;
+            message.sender = testUser2._id;
+            message.time = Date.now();
+            message.body = "Hi";
+            client2.emit("message", message);
+
+            client2.on("message", function(msg) {
+                assert(msg._id !== "undefined");
+                done();
+            });
+        });
+        it("Leave conversation", function(done) {
+            var data = {};
+            data.userId = testUser._id;
+            data.conversation = conversations[0]._id;
+            client2.emit("leaveConversation", data);
+
+            client1.on("leave-conversation", function(data) {
+                assert.equal(data.userId, testUser._id);
+                done();
+            });
+        });
+        it("Add user to conversation", function(done) {
+            var data = {};
+            data.participants = [{id: testUser._id}];
+            data.id = conversations[0]._id;
+            client2.emit("add-more-users", data);
+
+            client2.on("user-joined", function(msg) {
+                assert.equal(msg.participants.length, 2);
+                done();
+            });
+        });
+        it("change topic of conversation", function(done) {
+            var data = {};
+            data.id = conversations[0]._id;
+            data.topic = "test topic";
+            client1.emit("change-topic", data);
+            client2.on("change-topic", function(msg) {
+                assert.equal(msg.topic, data.topic);
+                done();
+            });
+        });
+        it("disconnect clients", function(done) {
+            client1.disconnect();
+            client2.disconnect();
+
+            client1 = io.connect("http://localhost:52685");
+            setTimeout(function() {
+                client1.disconnect();
+                done();
+            }, 500);
+        });
+        it("tests", function(done) {
+            client1 = io.connect("http://localhost:52685");
+            setTimeout(function() {
+                client1.emit("register_user", null);
+                done();
+            }, 500);
+        });
+
+    });
+
 });

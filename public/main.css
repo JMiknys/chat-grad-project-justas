@@ -1,3 +1,4 @@
+/*
 .wrapper {
   margin:20px;
 }
@@ -20,9 +21,8 @@
 }
 
 .messages-list li {
-  background: lightgrey;
-  border-radius: 25px;
-  padding: 20px;
+  border-radius: 10px;
+  padding: 10px;
   margin-top:10px;
 }
 
@@ -66,4 +66,126 @@
   margin: 0px;
   padding: 0px;
   list-style-type: none;
+}
+.blink {
+    -webkit-animation-name: blinker;
+    -webkit-animation-duration: 1s;
+    -webkit-animation-timing-function: linear;
+    -webkit-animation-iteration-count: infinite;
+
+    -moz-animation-name: blinker;
+    -moz-animation-duration: 1s;
+    -moz-animation-timing-function: linear;
+    -moz-animation-iteration-count: infinite;
+
+    animation-name: blinker;
+    animation-duration: 1s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+@-moz-keyframes blinker {
+    0% { opacity: 1.0; }
+    50% { opacity: 0.0; }
+    100% { opacity: 1.0; }
+}
+
+@-webkit-keyframes blinker {
+    0% { opacity: 1.0; }
+    50% { opacity: 0.0; }
+    100% { opacity: 1.0; }
+}
+
+@keyframes blinker {
+    0% { opacity: 1.0; }
+    50% { opacity: 0.0; }
+    100% { opacity: 1.0; }
+}
+*/
+
+.blink {
+    -webkit-animation-name: blinker;
+    -webkit-animation-duration: 1s;
+    -webkit-animation-timing-function: linear;
+    -webkit-animation-iteration-count: infinite;
+
+    -moz-animation-name: blinker;
+    -moz-animation-duration: 1s;
+    -moz-animation-timing-function: linear;
+    -moz-animation-iteration-count: infinite;
+
+    animation-name: blinker;
+    animation-duration: 1s;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+@-moz-keyframes blinker {
+    0% { opacity: 1.0; }
+    50% { opacity: 0.0; }
+    100% { opacity: 1.0; }
+}
+
+@-webkit-keyframes blinker {
+    0% { opacity: 1.0; }
+    50% { opacity: 0.0; }
+    100% { opacity: 1.0; }
+}
+
+@keyframes blinker {
+    0% { opacity: 1.0; }
+    50% { opacity: 0.0; }
+    100% { opacity: 1.0; }
+}
+details {
+  margin: 5px;
+}
+
+#conversation-container {
+  height:700px;
+  overflow-y: auto;
+}
+
+.no-style-ul {
+  margin: 0px;
+  padding: 0px;
+  list-style-type: none;
+}
+
+.messages-list li {
+  border-radius: 10px;
+  padding: 5px;
+  margin-top:10px;
+}
+
+.messages-list li p {
+  margin:0px;
+}
+
+.message-container {
+  margin-bottom:10px;
+  display: flex;
+}
+
+#conversation-container img {
+  padding: 0px;
+}
+
+.message-body {
+  flex: 1;
+}
+
+li:hover {
+    background: #dbc3d0;
+}
+
+.row .selected {
+  background: #c7a693;
+}
+.chat-window {
+  background-color: #f3f3f3;
+}
+
+.chat-meta {
+  background-color: #BBBABA;
 }
