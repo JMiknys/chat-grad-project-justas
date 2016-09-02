@@ -254,6 +254,24 @@
         });
 
         socket.on("leave-conversation", function (data) {
+            var index;
+            $scope.conversations.forEach(function (c, i) {
+                if (c._id === data.conversation) {
+                    index = i;
+                }
+            });
+
+            if (data.userId === $scope.user._id) {
+                $scope.conversations.splice(index, 1);
+            }
+            else {
+                var j = $scope.conversations[index].participants.indexOf(data.userId);
+                $scope.conversations[index].participants.splice(j, 1);
+            }
+            $scope.$apply();
+
+            /*
+            //for the person that is leaving
             if (data.userId === $scope.user._id) {
                 $scope.conversations.forEach(function (c, i) {
                     if (c._id === data.conversation) {
@@ -262,6 +280,11 @@
                     }
                 });
             }
+            else {
+                // For everyone else
+
+            }
+            */
         });
 
         socket.on("user-joined", function(conversation) {
@@ -297,7 +320,8 @@
             }
 
             // Add to unread messages if window is closed
-            if (typeof $scope.selectedConversation === "undefined" ||
+            console.log($scope.conversations);
+            if ($scope.selectedConversation === -1 ||
                 $scope.conversations[$scope.selectedConversation]._id !== msg.id) {
                 $scope.conversations[index].unread = $scope.conversations[index].unread + 1 || 1;
             }

@@ -423,9 +423,9 @@ describe("server", function() {
             var data = {};
             data.userId = testUser._id;
             data.conversation = conversations[0]._id;
-            client2.emit("leaveConversation", data);
+            client1.emit("leaveConversation", data);
 
-            client1.on("leave-conversation", function(data) {
+            client2.on("leave-conversation", function(data) {
                 assert.equal(data.userId, testUser._id);
                 done();
             });
