@@ -1,4 +1,5 @@
 /*globals io, alert, prompt, console */
+/*jshint loopfunc: true */
 (function() {
     var app = angular.module("ChatApp", []);
 
@@ -17,8 +18,6 @@
         $scope.conversations = [];
 
         // Store user profiles of others
-        $scope.userProfiles = [];
-
         $scope.onlineUsers = [];
 
         $scope.selectedConversation = -1;
@@ -35,7 +34,6 @@
                 $scope.users = result.data;
             });
             self.getConversations();
-            //self.getUserProfiles();
         }, function() {
                 $http.get("/api/oauth/uri").then(function(result) {
                     $scope.loginUri = result.data.uri;
@@ -57,11 +55,29 @@
             }, 10);
         };
         this.addToChat = function () {
-            if ($scope.selectedUser) {
-                var user = $scope.users.filter(function (u) {
-                    return u.id === $scope.selectedUser;
-                })[0];
-                $scope.chat.push(user);
+            if ($scope.selectedUser && $scope.selectedUser !== $scope.user._id) {
+                var duplicate = false;
+                $scope.chat.forEach(function (el) {
+                    if (el.id === $scope.selectedUser) {
+                        duplicate = true;
+                    }
+                });
+                if (!duplicate) {
+                    var user = $scope.users.filter(function (u) {
+                        return u.id === $scope.selectedUser;
+                    })[0];
+                    $scope.chat.push(user);
+                }
+            }
+        };
+
+        this.fastChat = function (user) {
+            if (user.id !== $scope.user._id) {
+                var payload = {};
+                payload.participants = [{id: $scope.user._id}, {id: user.id}];
+                payload.title =  $scope.user._id + ", " + user.id + " chat";
+                payload.messages = [{sender: $scope.user._id, time: Date.now(), body: "Hello"}];
+                socket.emit("new_conversation", payload);
             }
         };
         this.startChat = function () {
@@ -75,7 +91,6 @@
             data.messages = [{sender: $scope.user._id, time: Date.now(), body: "Hello"}];
 
             socket.emit("new_conversation", data);
-            //alert(JSON.stringify(data));
 
             $scope.title = "";
             $scope.chat = [];
@@ -175,11 +190,13 @@
         this.changeTopic = function () {
             var topic = prompt("Enter a new topic for '" + $scope.conversations[$scope.selectedConversation].title +
             "' conversation.");
-            var data = {};
-            data.id = $scope.conversations[$scope.selectedConversation]._id;
-            data.topic = topic;
-            console.log(data);
-            socket.emit("change-topic", data);
+            if (topic) {
+                var data = {};
+                data.id = $scope.conversations[$scope.selectedConversation]._id;
+                data.topic = topic;
+                console.log(data);
+                socket.emit("change-topic", data);
+            }
         };
 
         this.notify = function (title, body) {
@@ -188,6 +205,20 @@
             };
             var notification = new Notification(title, options);
         };
+
+        this.getUserNameById = function(userId) {
+            var index;
+            if ($scope.onlineUsers) {
+                $scope.onlineUsers.forEach(function (el, i) {
+                    if (userId === el._id) {
+                        index = i;
+                    }
+                });
+                return $scope.onlineUsers[index].name;
+            }
+            return userId;
+        };
+
         this.addUsersToConversation = function () {
             var form = document.getElementById("addUsers-form");
             var inputs = form.getElementsByTagName("input");
@@ -198,11 +229,21 @@
             for (var i = 0, length = inputs.length; i < length; i++) {
                 if (inputs[i].type === "checkbox" && inputs[i].checked === true) {
                     console.log("Checkbox found: " + inputs[i].value);
-                    data.participants.push({id: inputs[i].value});
+                    var duplicate = false;
+                    $scope.conversations[$scope.selectedConversation].participants.forEach(function (el) {
+                        if (el.id === inputs[i].value) {
+                            duplicate = true;
+                        }
+                    });
+                    if (!duplicate) {
+                        data.participants.push({id: inputs[i].value});
+                    }
                 }
             }
             data.id = $scope.conversations[$scope.selectedConversation]._id;
-            socket.emit("add-more-users", data);
+            if (data.participants.length > 0) {
+                socket.emit("add-more-users", data);
+            }
         };
 
         socket.on("init_conversations", function (msg) {
@@ -214,11 +255,9 @@
         socket.on("new_conversation", function (conversation) {
             $scope.conversations.push(conversation);
             var index = $scope.conversations.indexOf(conversation);
-
-            $scope.conversations[index].unread = 1;
-
+            //$scope.conversations[index].unread = 1;
+            $scope.selectedConversation = index;
             $scope.$apply();
-            console.log("New conversation initiated!");
         });
 
         socket.on("leave-conversation", function (data) {

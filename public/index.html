@@ -233,9 +233,9 @@
             <div class="col-md-3">
               <details>
                 <summary>Users</summary>
-                <input class="form-control" ng-model="$ctrl.query" placeholder="Find someone" />
+                <input class="form-control" ng-model="$ctrl.search" placeholder="Find someone" />
                 <ul class="no-style-ul">
-                    <li ng-repeat="user in users | filter:$ctrl.query">
+                    <li ng-repeat="user in users | filter:$ctrl.search" ng-click="ctrl.fastChat(user)">
                         <img height="42" width="42" ng-src="{{user.avatarUrl}}">
                         <span>{{user.name}}</span>
                         <img ng-show="!ctrl.isOnline(user.id)" src="images/red_circle.jpg"></img>
@@ -287,12 +287,12 @@
                               <ul>
                                 <li ng-repeat="user in chat">
                                     Name: {{user.name}}
-                                    <button class="btn btn-default">Remove</button>
+                                    <button class="btn btn-default" type="button">Remove</button>
                                 </li>
                               </ul>
                             </div>
                           </div>
-                          <button type="submit" class="btn btn-primary" ng-show="chat.length > 0" ng-click="ctrl.startChat()">Start a conversation</button>
+                          <button type="button" class="btn btn-primary" ng-show="chat.length > 0" ng-click="ctrl.startChat()" data-dismiss="modal">Start a conversation</button>
                         </form>
                       </div>
                       <div class="modal-footer">
@@ -313,7 +313,7 @@
                     </div>
                     <div class="message-body">
                       <li style="background-color: {{ctrl.getUserColor(message.sender)}};">
-                        <span style="font-weight:bold;">{{message.sender}} </span>
+                        <span style="font-weight:bold;">{{ctrl.getUserNameById(message.sender)}}</span>
                         <p>{{message.body}}</p>
                         <div style="font-style:italic; font-size:11px; color:grey; text-align:right;">{{message.time | date:"h:mma dd/MM "}}</div>
                       </li>
