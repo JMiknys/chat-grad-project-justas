@@ -5,11 +5,9 @@ var socketIo = require("socket.io");
 
 module.exports = function(port, db, githubAuthoriser) {
     var app = express();
-    //var server = http.Server(app);
+
     var server = app.listen(port);
     var io = socketIo.listen(server);
-
-    //server.listen(8080);
 
     app.use(express.static("public"));
     app.use(cookieParser());
@@ -19,9 +17,7 @@ module.exports = function(port, db, githubAuthoriser) {
 
     // Added variables by Justas
     var conversations = db.collection("conversations-justas");
-    // var io = require("socket.io").listen(9000);
     var clients = new Map();
-    //var onlineUsers = {};
     var onlineUsers = [];
     // load users
 
@@ -113,7 +109,6 @@ module.exports = function(port, db, githubAuthoriser) {
         console.log("Client disconnected: " + disconnectedUser);
         if (disconnectedUser !== null) {
             setUserOnlineStatus(disconnectedUser, false);
-            //delete onlineUsers[disconnectedUser];
             clients.delete(socket);
             // Let everyone else know that user went offline
             io.sockets.emit("user-update", getUserProfile(disconnectedUser));
@@ -157,11 +152,9 @@ module.exports = function(port, db, githubAuthoriser) {
         // Register User
         socket.on("register_user", function(userId) {
             clients.set(socket, userId);
-            //onlineUsers[userId] = "online";
             setUserOnlineStatus(userId, true);
 
             console.log("user registered: " + clients.get(socket));
-
             // send the client a list of other registered users
             socket.emit("users", onlineUsers);
 
@@ -198,7 +191,6 @@ module.exports = function(port, db, githubAuthoriser) {
                 // Add all participants to the room
                 msg.participants.forEach(function(el) {
                     clients.forEach(function (val, key, map) {
-                        //console.log(val+"==="+el.id);
                         // If person currently is online, add him to the chat channel
                         if (val === el.id) {
                             key.join(msg._id);
@@ -214,7 +206,6 @@ module.exports = function(port, db, githubAuthoriser) {
         socket.on("init_conversations", function(clientId) {
             console.log("Client asked to get conversations. Asker: " + clientId);
             var results = conversations.find({"participants.id": clientId}).toArray(function (err, items) {
-                //console.log(JSON.stringify(items));
                 socket.emit("init_conversations", items);
                 // Subscribe to all rooms
                 items.forEach(function (el) {
@@ -226,7 +217,6 @@ module.exports = function(port, db, githubAuthoriser) {
         socket.on("message", function(msg) {
             console.log("Received a new message request: " + JSON.stringify(msg));
             //conversations.insertOne(msg);
-            //var cnv = conversations.find(ObjectId(msg.id));
             conversations.updateOne(
               {_id: new ObjectID(msg.id)},
               {$push: {"messages": {
@@ -251,10 +241,8 @@ module.exports = function(port, db, githubAuthoriser) {
                 // callback after user is deleted from conversation
             });
 
-            //var msg = {id: data.conversation, sender: "Server", time: Date.now(), body: "Stuff"};
             io.to(data.conversation).emit("leave-conversation", data);
-            //TODO: UNSUBSCRIBE FROM CONVERSATION!
-            //io.to(data.conversation).emit("message", "User: " + data.userId + " has lef the conversation.");
+            socket.leave(data.conversation);
         });
 
         // Add more users to conversation
@@ -276,7 +264,6 @@ module.exports = function(port, db, githubAuthoriser) {
                         });
                     });
             });
-
             // Tell everyone in the channel about new user
             var results = conversations.find({"_id": new ObjectID(data.id)}).toArray(function (err, items) {
                 // Send conversation to everyone in the chat

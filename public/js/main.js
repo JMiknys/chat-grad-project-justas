@@ -9,8 +9,6 @@
         var socket = io();
         $scope.loggedIn = false;
 
-        //$scope.color = "lightgrey";
-
         // Array of users for new chat
         $scope.chat = [];
 
@@ -97,9 +95,6 @@
         };
 
         this.sendMessage = function () {
-            //e.preventDefault();
-            //alert("Message: "+$scope.newMessage);
-
             var data = {};
             data.id = $scope.conversations[$scope.selectedConversation]._id;
             data.body = $scope.newMessage;
@@ -108,7 +103,6 @@
             socket.emit("message", data);
 
             // Remove input from textbox
-            //document.getElementById(conversation + "-input").value = "";
             $scope.newMessage = "";
         };
 
@@ -255,7 +249,6 @@
         socket.on("new_conversation", function (conversation) {
             $scope.conversations.push(conversation);
             var index = $scope.conversations.indexOf(conversation);
-            //$scope.conversations[index].unread = 1;
             $scope.selectedConversation = index;
             $scope.$apply();
         });
@@ -299,20 +292,11 @@
             var index = $scope.conversations.indexOf(conversation);
             conversation.messages.push(msg);
 
-            /* TODO: PUTTING MESSAGE AT TOP CAUSES TOO MUCH PROBLEMS
-            // If the message don't come from same user, put conversationw ith newest message at top
-            if (msg.sender !== $scope.users._id && index !== 0) {
-                $scope.conversations.splice(index);
-                $scope.conversations.unshift(conversation);
-                //$scope.$apply();
-            }
-            */
             if (msg.sender !== "Server" && msg.sender !== $scope.user._id) {
                 self.notify("New message received", "Message from " + msg.sender);
             }
 
             // Add to unread messages if window is closed
-
             if (typeof $scope.selectedConversation === "undefined" ||
                 $scope.conversations[$scope.selectedConversation]._id !== msg.id) {
                 $scope.conversations[index].unread = $scope.conversations[index].unread + 1 || 1;
